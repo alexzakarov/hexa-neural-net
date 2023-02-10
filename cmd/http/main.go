@@ -5,9 +5,10 @@ import (
 	"log"
 	"main/config"
 	_ "main/docs"
-	authServices "main/internal/auth/application/services"
-	authHandlers "main/internal/auth/handler/http"
-	authRepos "main/internal/auth/infrastructure/repository"
+	neuralNetJobs "main/internal/neural-net/application/jobs"
+	neuralNetServices "main/internal/neural-net/application/services"
+	neuralNetHandlers "main/internal/neural-net/handler/http"
+	neuralNetRepos "main/internal/neural-net/infrastructure/repository"
 	"main/pkg/databases/postgresql"
 	"main/pkg/logger"
 	"main/pkg/server"
@@ -43,10 +44,13 @@ func main() {
 	}
 
 	// Init repositories
-	pgRepo := authRepos.NewPostgresqlRepository(postgresqlDB)
+	pgRepo := neuralNetRepos.NewPostgresqlRepository(postgresqlDB)
 
 	// Init services
-	authService := authServices.NewAuthService(cfg, pgRepo, appLogger)
+	neuralNetService := neuralNetServices.NewNeuralNetService(cfg, pgRepo, appLogger)
+
+	//Init jobs
+	neuraLNetJobs := neuralNetJobs.NewJobRunner(cfg, appLogger, neuralNetService)
 
 	// Interceptors
 	//
@@ -60,12 +64,15 @@ func main() {
 	versioning := httpServer.Group("/v1")
 
 	// Init handlers for HTTP Server
-	authHandler := authHandlers.NewHttpHandler(ctx, cfg, authService, appLogger)
+	neuralNetHandler := neuralNetHandlers.NewHttpHandler(ctx, cfg, neuralNetService, appLogger)
 
 	// Init routes for HTTP Server
-	authHandlers.MapRoutes(authHandler, versioning)
+	neuralNetHandlers.MapRoutes(neuralNetHandler, versioning)
 
 	//telegram.SendMessage("Send Message to telegram channel")
+
+	//Start Jobs
+	go neuraLNetJobs.TrainNeuralNet(ctx)
 
 	// Exit from application gracefully
 	graceful_exit.TerminateApp(ctx)
