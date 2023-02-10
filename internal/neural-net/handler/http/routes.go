@@ -2,7 +2,7 @@ package http
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"main/internal/auth/domain/ports"
+	"main/internal/neural-net/domain/ports"
 )
 
 // MapRoutes Auth Domain routes
