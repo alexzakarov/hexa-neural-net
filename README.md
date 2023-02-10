@@ -1,1 +1,1 @@
-# hexa-neural
+# hexa-neural-net
