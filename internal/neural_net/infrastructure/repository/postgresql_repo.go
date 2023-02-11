@@ -2,7 +2,7 @@ package repository
 
 import (
 	"github.com/jackc/pgx/v4/pgxpool"
-	"main/internal/neural-net/domain/ports"
+	"main/internal/neural_net/domain/ports"
 )
 
 // postgresqlRepo Struct

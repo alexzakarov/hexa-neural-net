@@ -2,7 +2,7 @@ package services
 
 import (
 	"main/config"
-	"main/internal/neural-net/domain/ports"
+	"main/internal/neural_net/domain/ports"
 	"main/pkg/logger"
 )
 
