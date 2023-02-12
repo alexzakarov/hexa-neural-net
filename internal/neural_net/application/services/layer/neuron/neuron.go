@@ -1,73 +1,30 @@
 package neuron
 
 import (
+	"main/internal/neural_net/application/services/layer/neuron/synapse"
 	"main/internal/neural_net/domain/entities"
-	"main/internal/neural_net/domain/ports"
 	"main/internal/neural_net/domain/utils"
 )
 
 // Neuron is a neural network node
 type Neuron struct {
 	A     entities.ActivationType `json:"-"`
-	In    []ports.ISynapse
-	Out   []ports.ISynapse
+	In    []*synapse.Synapse
+	Out   []*synapse.Synapse
 	Value float64 `json:"-"`
 }
 
 // NewNeuron returns a neuron with the given activation
-func NewNeuron(activation entities.ActivationType) ports.INeuron {
+func NewNeuron(activation entities.ActivationType) *Neuron {
 	return &Neuron{
-		A:     activation,
-		In:    []ports.ISynapse{},
-		Out:   []ports.ISynapse{},
-		Value: 0,
+		A: activation,
 	}
-}
-
-func (n *Neuron) GetA() entities.ActivationType {
-	return n.A
-}
-
-func (n *Neuron) GetIn() []ports.ISynapse {
-	return n.In
-}
-
-func (n *Neuron) GetOut() []ports.ISynapse {
-	return n.Out
-}
-
-func (n *Neuron) GetValue() float64 {
-	return n.Value
-}
-
-func (n *Neuron) SetA(a entities.ActivationType) {
-	n.A = a
-}
-
-func (n *Neuron) SetIn(synapse []ports.ISynapse) {
-	n.In = synapse
-}
-
-func (n *Neuron) SetOut(synapse []ports.ISynapse) {
-	n.Out = synapse
-}
-
-func (n *Neuron) SetValue(value float64) {
-	n.Value = value
-}
-
-func (n *Neuron) AddIn(synapse ports.ISynapse) {
-	n.In = append(n.In, synapse)
-}
-
-func (n *Neuron) AddOut(synapse ports.ISynapse) {
-	n.Out = append(n.Out, synapse)
 }
 
 func (n *Neuron) Fire() {
 	var sum float64
 	for _, s := range n.In {
-		sum += s.GetOut()
+		sum += s.Out
 	}
 	n.Value = n.Activate(sum)
 

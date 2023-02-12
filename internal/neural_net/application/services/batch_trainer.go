@@ -1,8 +1,8 @@
 package services
 
 import (
+	"main/internal/neural_net/application/services/layer"
 	"main/internal/neural_net/application/services/solver"
-	"main/internal/neural_net/domain/ports"
 	"main/internal/neural_net/domain/utils"
 	"sync"
 	"time"
@@ -11,7 +11,6 @@ import (
 // BatchTrainer implements parallelized batch training
 type BatchTrainer struct {
 	*internalb
-	neuralNet   ports.INeuralNet
 	verbosity   int
 	batchSize   int
 	parallelism int
@@ -26,7 +25,7 @@ type internalb struct {
 	moments           [][][]float64
 }
 
-func newBatchTraining(layers []ports.ILayer, parallelism int) *internalb {
+func newBatchTraining(layers []*layer.Layer, parallelism int) *internalb {
 	deltas := make([][][]float64, parallelism)
 	partialDeltas := make([][][][]float64, parallelism)
 	accumulatedDeltas := make([][][]float64, len(layers))
@@ -35,12 +34,12 @@ func newBatchTraining(layers []ports.ILayer, parallelism int) *internalb {
 		partialDeltas[w] = make([][][]float64, len(layers))
 
 		for i, l := range layers {
-			deltas[w][i] = make([]float64, len(l.GetNeurons()))
-			accumulatedDeltas[i] = make([][]float64, len(l.GetNeurons()))
-			partialDeltas[w][i] = make([][]float64, len(l.GetNeurons()))
-			for j, n := range l.GetNeurons() {
-				partialDeltas[w][i][j] = make([]float64, len(n.GetIn()))
-				accumulatedDeltas[i][j] = make([]float64, len(n.GetIn()))
+			deltas[w][i] = make([]float64, len(l.Neurons))
+			accumulatedDeltas[i] = make([][]float64, len(l.Neurons))
+			partialDeltas[w][i] = make([][]float64, len(l.Neurons))
+			for j, n := range l.Neurons {
+				partialDeltas[w][i][j] = make([]float64, len(n.In))
+				accumulatedDeltas[i][j] = make([]float64, len(n.In))
 			}
 		}
 	}
@@ -52,9 +51,8 @@ func newBatchTraining(layers []ports.ILayer, parallelism int) *internalb {
 }
 
 // NewBatchTrainer returns a BatchTrainer
-func NewBatchTrainer(n ports.INeuralNet, solver solver.Solver, verbosity, batchSize, parallelism int) *BatchTrainer {
+func NewBatchTrainer(solver solver.Solver, verbosity, batchSize, parallelism int) *BatchTrainer {
 	return &BatchTrainer{
-		neuralNet:   n,
 		solver:      solver,
 		verbosity:   verbosity,
 		batchSize:   utils.Iparam(batchSize, 1),
@@ -64,31 +62,31 @@ func NewBatchTrainer(n ports.INeuralNet, solver solver.Solver, verbosity, batchS
 }
 
 // Train trains n
-func (t *BatchTrainer) Train(examples, validation Examples, iterations int) {
-	t.internalb = newBatchTraining(t.neuralNet.GetLayers(), t.parallelism)
+func (t *BatchTrainer) Train(n *Neural, examples, validation Examples, iterations int) {
+	t.internalb = newBatchTraining(n.Layers, t.parallelism)
 
 	train := make(Examples, len(examples))
 	copy(train, examples)
 
 	workCh := make(chan Example, t.parallelism)
-	nets := make([]ports.INeuralNet, t.parallelism)
+	nets := make([]*Neural, t.parallelism)
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < t.parallelism; i++ {
-		nets[i] = NewNeural(t.neuralNet.GetConfig())
+		nets[i] = NewNeural(n.Config)
 
 		go func(id int, workCh <-chan Example) {
 			n := nets[id]
 			for e := range workCh {
 				n.Forward(e.Input)
-				t.calculateDeltas(e.Response, id)
+				t.calculateDeltas(n, e.Response, id)
 				wg.Done()
 			}
 		}(i, workCh)
 	}
 
-	t.printer.Init(t.neuralNet)
-	t.solver.Init(t.neuralNet.NumWeights())
+	t.printer.Init(n)
+	t.solver.Init(n.NumWeights())
 
 	ts := time.Now()
 	for it := 1; it <= iterations; it++ {
@@ -96,7 +94,7 @@ func (t *BatchTrainer) Train(examples, validation Examples, iterations int) {
 		batches := train.SplitSize(t.batchSize)
 
 		for _, b := range batches {
-			currentWeights := t.neuralNet.Weights()
+			currentWeights := n.Weights()
 			for _, n := range nets {
 				n.ApplyWeights(currentWeights)
 			}
@@ -120,66 +118,67 @@ func (t *BatchTrainer) Train(examples, validation Examples, iterations int) {
 				}
 			}
 
-			t.update(t.neuralNet, it)
+			t.update(n, it)
 		}
 
 		if t.verbosity > 0 && it%t.verbosity == 0 && len(validation) > 0 {
-			t.printer.PrintProgress(t.neuralNet, validation, time.Since(ts), it)
+			t.printer.PrintProgress(n, validation, time.Since(ts), it)
 		}
 	}
+
 }
 
-func (t *BatchTrainer) calculateDeltas(ideal []float64, wid int) {
-	loss := GetLoss(t.neuralNet.GetConfig().Loss)
+func (t *BatchTrainer) calculateDeltas(n *Neural, ideal []float64, wid int) {
+	loss := GetLoss(n.Config.Loss)
 	deltas := t.deltas[wid]
 	partialDeltas := t.partialDeltas[wid]
-	lastDeltas := deltas[len(t.neuralNet.GetLayers())-1]
+	lastDeltas := deltas[len(n.Layers)-1]
 
-	for i, n := range t.neuralNet.GetLayers()[len(t.neuralNet.GetLayers())-1].GetNeurons() {
+	for i, n := range n.Layers[len(n.Layers)-1].Neurons {
 		lastDeltas[i] = loss.Df(
-			n.GetValue(),
+			n.Value,
 			ideal[i],
-			n.DActivate(n.GetValue()))
+			n.DActivate(n.Value))
 	}
 
-	for i := len(t.neuralNet.GetLayers()) - 2; i >= 0; i-- {
-		l := t.neuralNet.GetLayers()[i]
+	for i := len(n.Layers) - 2; i >= 0; i-- {
+		l := n.Layers[i]
 		iD := deltas[i]
 		nextD := deltas[i+1]
-		for j, n := range l.GetNeurons() {
+		for j, n := range l.Neurons {
 			var sum float64
-			for k, s := range n.GetOut() {
-				sum += s.GetWeight() * nextD[k]
+			for k, s := range n.Out {
+				sum += s.Weight * nextD[k]
 			}
-			iD[j] = n.DActivate(n.GetValue()) * sum
+			iD[j] = n.DActivate(n.Value) * sum
 		}
 	}
 
-	for i, l := range t.neuralNet.GetLayers() {
+	for i, l := range n.Layers {
 		iD := deltas[i]
 		iPD := partialDeltas[i]
-		for j, n := range l.GetNeurons() {
+		for j, n := range l.Neurons {
 			jD := iD[j]
 			jPD := iPD[j]
-			for k, s := range n.GetIn() {
-				jPD[k] += jD * s.GetIn()
+			for k, s := range n.In {
+				jPD[k] += jD * s.In
 			}
 		}
 	}
 }
 
-func (t *BatchTrainer) update(n ports.INeuralNet, it int) {
+func (t *BatchTrainer) update(n *Neural, it int) {
 	var idx int
-	for i, l := range n.GetLayers() {
+	for i, l := range n.Layers {
 		iAD := t.accumulatedDeltas[i]
-		for j, n := range l.GetNeurons() {
+		for j, n := range l.Neurons {
 			jAD := iAD[j]
-			for k, s := range n.GetIn() {
-				update := t.solver.Update(s.GetWeight(),
+			for k, s := range n.In {
+				update := t.solver.Update(s.Weight,
 					jAD[k],
 					it,
 					idx)
-				s.SetWeight(s.GetWeight() + update)
+				s.Weight += update
 				jAD[k] = 0
 				idx++
 			}

@@ -5,19 +5,18 @@ import (
 	"main/internal/neural_net/application/services/layer"
 	"main/internal/neural_net/application/services/layer/neuron/synapse"
 	"main/internal/neural_net/domain/entities"
-	"main/internal/neural_net/domain/ports"
 	"main/internal/neural_net/domain/utils"
 )
 
 // Neural is a neural network
 type Neural struct {
-	Layers []ports.ILayer
-	Biases [][]ports.ISynapse
-	Config entities.Config
+	Layers []*layer.Layer
+	Biases [][]*synapse.Synapse
+	Config *entities.Config
 }
 
 // NewNeural returns a new neural network
-func NewNeural(c entities.Config) ports.INeuralNet {
+func NewNeural(c *entities.Config) *Neural {
 
 	if c.Weight == nil {
 		c.Weight = synapse.NewUniform(0.5, 0)
@@ -36,11 +35,11 @@ func NewNeural(c entities.Config) ports.INeuralNet {
 		}
 	}
 
-	layers := InitializeLayers(c)
+	layers := initializeLayers(c)
 
-	var biases [][]ports.ISynapse
+	var biases [][]*synapse.Synapse
 	if c.Bias {
-		biases = make([][]ports.ISynapse, len(layers))
+		biases = make([][]*synapse.Synapse, len(layers))
 		for i := 0; i < len(layers); i++ {
 			if c.Mode == entities.ModeRegression && i == len(layers)-1 {
 				continue
@@ -56,19 +55,8 @@ func NewNeural(c entities.Config) ports.INeuralNet {
 	}
 }
 
-func (n *Neural) GetLayers() []ports.ILayer {
-	return n.Layers
-}
-
-func (n *Neural) GetBiases() [][]ports.ISynapse {
-	return n.Biases
-}
-
-func (n *Neural) GetConfig() entities.Config {
-	return n.Config
-}
-func InitializeLayers(c entities.Config) []ports.ILayer {
-	layers := make([]ports.ILayer, len(c.Layout))
+func initializeLayers(c *entities.Config) []*layer.Layer {
+	layers := make([]*layer.Layer, len(c.Layout))
 	for i := range layers {
 		act := c.Activation
 		if i == (len(layers)-1) && c.Mode != entities.ModeDefault {
@@ -81,10 +69,10 @@ func InitializeLayers(c entities.Config) []ports.ILayer {
 		layers[i].Connect(layers[i+1], c.Weight)
 	}
 
-	for _, neuron := range layers[0].GetNeurons() {
-		neuron.SetIn(make([]ports.ISynapse, c.Inputs))
-		for i := range neuron.GetIn() {
-			neuron.GetIn()[i] = synapse.NewSynapse(c.Weight())
+	for _, neuron := range layers[0].Neurons {
+		neuron.In = make([]*synapse.Synapse, c.Inputs)
+		for i := range neuron.In {
+			neuron.In[i] = synapse.NewSynapse(c.Weight())
 		}
 	}
 
@@ -107,9 +95,9 @@ func (n *Neural) Forward(input []float64) error {
 	if len(input) != n.Config.Inputs {
 		return fmt.Errorf("Invalid input dimension - expected: %d got: %d", n.Config.Inputs, len(input))
 	}
-	for _, n := range n.Layers[0].GetNeurons() {
+	for _, n := range n.Layers[0].Neurons {
 		for i := 0; i < len(input); i++ {
-			n.GetIn()[i].Fire(input[i])
+			n.In[i].Fire(input[i])
 		}
 	}
 	n.Fire()
@@ -121,9 +109,9 @@ func (n *Neural) Predict(input []float64) []float64 {
 	n.Forward(input)
 
 	outLayer := n.Layers[len(n.Layers)-1]
-	out := make([]float64, len(outLayer.GetNeurons()))
-	for i, neuron := range outLayer.GetNeurons() {
-		out[i] = neuron.GetValue()
+	out := make([]float64, len(outLayer.Neurons))
+	for i, neuron := range outLayer.Neurons {
+		out[i] = neuron.Value
 	}
 	return out
 }
@@ -131,8 +119,8 @@ func (n *Neural) Predict(input []float64) []float64 {
 // NumWeights returns the number of weights in the network
 func (n *Neural) NumWeights() (num int) {
 	for _, l := range n.Layers {
-		for _, n := range l.GetNeurons() {
-			num += len(n.GetIn())
+		for _, n := range l.Neurons {
+			num += len(n.In)
 		}
 	}
 	return
@@ -144,38 +132,4 @@ func (n *Neural) String() string {
 		s = fmt.Sprintf("%s\n%s", s, l)
 	}
 	return s
-}
-
-// ApplyWeights sets the weights from a three-dimensional slice
-func (n *Neural) ApplyWeights(weights [][][]float64) {
-	for i, l := range n.Layers {
-		for j := range l.GetNeurons() {
-			for k := range l.GetNeurons()[j].GetIn() {
-				n.Layers[i].GetNeurons()[j].GetIn()[k].SetWeight(weights[i][j][k])
-			}
-		}
-	}
-}
-
-// Weights returns all weights in sequence
-func (n *Neural) Weights() [][][]float64 {
-	weights := make([][][]float64, len(n.Layers))
-	for i, l := range n.Layers {
-		weights[i] = make([][]float64, len(l.GetNeurons()))
-		for j, n := range l.GetNeurons() {
-			weights[i][j] = make([]float64, len(n.GetIn()))
-			for k, in := range n.GetIn() {
-				weights[i][j][k] = in.GetWeight()
-			}
-		}
-	}
-	return weights
-}
-
-// Dump generates a network dump
-func (n *Neural) Dump() *entities.Dump {
-	return &entities.Dump{
-		Config:  n.Config,
-		Weights: n.Weights(),
-	}
 }

@@ -28,7 +28,7 @@ func Test_BoundedRegression(t *testing.T) {
 		for i := 0.0; i < 1; i += 0.01 {
 			data = append(data, services.Example{Input: []float64{i}, Response: []float64{f(i)}})
 		}
-		n := services.NewNeural(entities.Config{
+		n := services.NewNeural(&entities.Config{
 			Inputs:     1,
 			Layout:     []int{4, 4, 1},
 			Activation: entities.ActivationTanh,
@@ -37,8 +37,8 @@ func Test_BoundedRegression(t *testing.T) {
 			Bias:       true,
 		})
 
-		trainer := services.NewTrainer(n, solver.NewSGD(0.25, 0.5, 0, false), 0)
-		trainer.Train(data, nil, 5000)
+		trainer := services.NewTrainer(solver.NewSGD(0.25, 0.5, 0, false), 0)
+		trainer.Train(n, data, nil, 5000)
 
 		tests := []float64{0.0, 0.1, 0.25, 0.5, 0.75, 0.9}
 		for _, x := range tests {
@@ -47,32 +47,31 @@ func Test_BoundedRegression(t *testing.T) {
 	}
 }
 
-/*
-	func Test_RegressionLinearOuts(t *testing.T) {
-		rand.Seed(0)
-		squares := services.Examples{}
-		for i := 0.0; i < 100.0; i++ {
-			squares = append(squares, services.Example{Input: []float64{i}, Response: []float64{math.Sqrt(i)}})
-		}
-		squares.Shuffle()
-		n := services.NewNeural(entities.Config{
-			Inputs:     1,
-			Layout:     []int{3, 3, 1},
-			Activation: entities.ActivationReLU,
-			Mode:       entities.ModeRegression,
-			Weight:     synapse.NewNormal(0.5, 0.5),
-			Bias:       true,
-		})
-
-		trainer := services.NewBatchTrainer(n, solver.NewAdam(0.01, 0, 0, 0), 0, 25, 2)
-		trainer.Train(squares, nil, 25000)
-
-		for i := 0; i < 100; i++ {
-			x := float64(rand.Intn(99) + 1)
-			assert.InEpsilon(t, math.Sqrt(x)+1, n.Predict([]float64{x})[0]+1, 0.1)
-		}
+func Test_RegressionLinearOuts(t *testing.T) {
+	rand.Seed(0)
+	squares := services.Examples{}
+	for i := 0.0; i < 100.0; i++ {
+		squares = append(squares, services.Example{Input: []float64{i}, Response: []float64{math.Sqrt(i)}})
 	}
-*/
+	squares.Shuffle()
+	n := services.NewNeural(&entities.Config{
+		Inputs:     1,
+		Layout:     []int{3, 3, 1},
+		Activation: entities.ActivationReLU,
+		Mode:       entities.ModeRegression,
+		Weight:     synapse.NewNormal(0.5, 0.5),
+		Bias:       true,
+	})
+	trainer := services.NewBatchTrainer(solver.NewAdam(0.01, 0, 0, 0), 0, 25, 2)
+	trainer.Train(n, squares, nil, 25000)
+	fmt.Println(fmt.Sprintf("%v", n.Predict([]float64{0.2})))
+
+	for i := 0; i < 100; i++ {
+		x := float64(rand.Intn(99) + 1)
+		assert.InEpsilon(t, math.Sqrt(x)+1, n.Predict([]float64{x})[0]+1, 0.1)
+	}
+}
+
 func Test_Training(t *testing.T) {
 	rand.Seed(0)
 
@@ -84,7 +83,7 @@ func Test_Training(t *testing.T) {
 		services.Example{[]float64{5}, []float64{1}},
 	}
 
-	n := services.NewNeural(entities.Config{
+	n := services.NewNeural(&entities.Config{
 		Inputs:     1,
 		Layout:     []int{5, 1},
 		Activation: entities.ActivationSigmoid,
@@ -92,8 +91,8 @@ func Test_Training(t *testing.T) {
 		Bias:       true,
 	})
 
-	trainer := services.NewTrainer(n, solver.NewSGD(0.5, 0.1, 0, false), 0)
-	trainer.Train(data, nil, 1000)
+	trainer := services.NewTrainer(solver.NewSGD(0.5, 0.1, 0, false), 0)
+	trainer.Train(n, data, nil, 1000)
 
 	v := n.Predict([]float64{0})
 	assert.InEpsilon(t, 1, 1+v[0], 0.1)
@@ -117,16 +116,16 @@ var data = services.Examples{
 func Test_Prediction(t *testing.T) {
 	rand.Seed(0)
 
-	n := services.NewNeural(entities.Config{
+	n := services.NewNeural(&entities.Config{
 		Inputs:     2,
 		Layout:     []int{2, 2, 1},
 		Activation: entities.ActivationSigmoid,
 		Weight:     synapse.NewUniform(0.5, 0),
 		Bias:       true,
 	})
-	trainer := services.NewTrainer(n, solver.NewSGD(0.5, 0.1, 0, false), 0)
+	trainer := services.NewTrainer(solver.NewSGD(0.5, 0.1, 0, false), 0)
 
-	trainer.Train(data, nil, 5000)
+	trainer.Train(n, data, nil, 5000)
 
 	for _, d := range data {
 		assert.InEpsilon(t, n.Predict(d.Input)[0]+1, d.Response[0]+1, 0.1)
@@ -134,7 +133,7 @@ func Test_Prediction(t *testing.T) {
 }
 
 func Test_CrossVal(t *testing.T) {
-	n := services.NewNeural(entities.Config{
+	n := services.NewNeural(&entities.Config{
 		Inputs:     2,
 		Layout:     []int{1, 1},
 		Activation: entities.ActivationTanh,
@@ -143,8 +142,8 @@ func Test_CrossVal(t *testing.T) {
 		Bias:       true,
 	})
 
-	trainer := services.NewTrainer(n, solver.NewSGD(0.5, 0.1, 0, false), 0)
-	trainer.Train(data, data, 1000)
+	trainer := services.NewTrainer(solver.NewSGD(0.5, 0.1, 0, false), 0)
+	trainer.Train(n, data, data, 1000)
 
 	for _, d := range data {
 		assert.InEpsilon(t, n.Predict(d.Input)[0]+1, d.Response[0]+1, 0.1)
@@ -166,9 +165,9 @@ func Test_MultiClass(t *testing.T) {
 		{[]float64{7.673756466, 3.508563011}, []float64{0, 1}},
 	}
 
-	n := services.NewNeural(entities.Config{
+	n := services.NewNeural(&entities.Config{
 		Inputs:     2,
-		Layout:     []int{2, 2},
+		Layout:     []int{3, 2},
 		Activation: entities.ActivationReLU,
 		Mode:       entities.ModeMultiClass,
 		Loss:       entities.LossMeanSquared,
@@ -176,8 +175,8 @@ func Test_MultiClass(t *testing.T) {
 		Bias:       true,
 	})
 
-	trainer := services.NewTrainer(n, solver.NewSGD(0.01, 0.1, 0, false), 0)
-	trainer.Train(data, data, 1000)
+	trainer := services.NewTrainer(solver.NewSGD(0.01, 0.1, 0, false), 0)
+	trainer.Train(n, data, data, 1000)
 
 	for _, d := range data {
 		est := n.Predict(d.Input)
@@ -194,7 +193,7 @@ func Test_MultiClass(t *testing.T) {
 
 func Test_or(t *testing.T) {
 	rand.Seed(0)
-	n := services.NewNeural(entities.Config{
+	n := services.NewNeural(&entities.Config{
 		Inputs:     2,
 		Layout:     []int{1, 1},
 		Activation: entities.ActivationTanh,
@@ -209,22 +208,22 @@ func Test_or(t *testing.T) {
 		{[]float64{1, 1}, []float64{1}},
 	}
 
-	trainer := services.NewTrainer(n, solver.NewSGD(0.5, 0, 0, false), 10)
+	trainer := services.NewTrainer(solver.NewSGD(0.5, 0, 0, false), 10)
 
-	trainer.Train(permutations, permutations, 25)
+	trainer.Train(n, permutations, permutations, 25)
 
 	for _, perm := range permutations {
 		assert.Equal(t, utils.Round(n.Predict(perm.Input)[0]), perm.Response[0])
 	}
-	fmt.Println(n.Predict([]float64{0, 0}))
+	fmt.Println(n.Predict([]float64{0, 1}))
 
 }
 
 func Test_xor(t *testing.T) {
 	rand.Seed(0)
-	n := services.NewNeural(entities.Config{
+	n := services.NewNeural(&entities.Config{
 		Inputs:     2,
-		Layout:     []int{3, 1}, // Sufficient for modeling (AND+OR) - with 5-6 neuron always converges
+		Layout:     []int{5, 1}, // Sufficient for modeling (AND+OR) - with 5-6 neuron always converges
 		Activation: entities.ActivationSigmoid,
 		Mode:       entities.ModeBinary,
 		Weight:     synapse.NewUniform(.25, 0),
@@ -237,13 +236,13 @@ func Test_xor(t *testing.T) {
 		{[]float64{1, 1}, []float64{0}},
 	}
 
-	trainer := services.NewTrainer(n, solver.NewSGD(1.0, 0.1, 1e-6, false), 50)
-	trainer.Train(permutations, permutations, 500)
+	trainer := services.NewTrainer(solver.NewSGD(1, 0.1, 1e-6, false), 50)
+	trainer.Train(n, permutations, permutations, 1000)
 
 	for _, perm := range permutations {
 		assert.InEpsilon(t, n.Predict(perm.Input)[0]+1, perm.Response[0]+1, 0.2)
 	}
-	fmt.Println(n.Predict([]float64{1, 1}))
+	fmt.Println(n.Predict([]float64{0, 0})[0])
 
 }
 

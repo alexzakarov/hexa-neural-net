@@ -101,9 +101,3 @@ const (
 	// LossMeanSquared is MSE
 	LossMeanSquared LossType = 3
 )
-
-// Dump is a neural network dump
-type Dump struct {
-	Config  Config
-	Weights [][][]float64
-}

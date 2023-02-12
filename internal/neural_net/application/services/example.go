@@ -32,7 +32,7 @@ func (e Examples) Split(p float64) (first, second Examples) {
 	return
 }
 
-// SplitSize splits slice into parts of size size
+// SplitSize splits slice into parts of size
 func (e Examples) SplitSize(size int) []Examples {
 	res := make([]Examples, 0)
 	for i := 0; i < len(e); i += size {

@@ -2,7 +2,6 @@ package jobs
 
 import (
 	"context"
-	"fmt"
 	"main/config"
 	"main/internal/neural_net/domain/ports"
 	"main/pkg/logger"
@@ -25,5 +24,6 @@ func NewJobRunner(cfg *config.Config, logger logger.Logger, srv ports.IService) 
 }
 
 func (w *jobRunner) TrainNeuralNet(ctx context.Context) {
-	fmt.Println("test")
+	w.logger.Info("Training is started")
+	w.srv.Train()
 }

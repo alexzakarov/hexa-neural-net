@@ -13,7 +13,7 @@ import (
 
 func Benchmark_xor(b *testing.B) {
 	rand.Seed(time.Now().Unix())
-	n := services.NewNeural(entities.Config{
+	n := services.NewNeural(&entities.Config{
 		Inputs:     2,
 		Layout:     []int{3, 3, 1},
 		Activation: entities.ActivationSigmoid,
@@ -36,7 +36,7 @@ func Benchmark_xor(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		const iterations = 20
 		solver := solver.NewAdam(0.001, 0.9, 0.999, 1e-100)
-		trainer := services.NewBatchTrainer(n, solver, iterations, len(dupExs)/2, runtime.NumCPU())
-		trainer.Train(dupExs, dupExs, iterations)
+		trainer := services.NewBatchTrainer(solver, iterations, len(dupExs)/2, runtime.NumCPU())
+		trainer.Train(n, dupExs, dupExs, iterations)
 	}
 }

@@ -5,19 +5,18 @@ import (
 	"main/internal/neural_net/application/services/layer/neuron"
 	"main/internal/neural_net/application/services/layer/neuron/synapse"
 	"main/internal/neural_net/domain/entities"
-	"main/internal/neural_net/domain/ports"
 	"main/internal/neural_net/domain/utils"
 )
 
 // Layer is a set of neurons and corresponding activation
 type Layer struct {
-	Neurons []ports.INeuron
+	Neurons []*neuron.Neuron
 	A       entities.ActivationType
 }
 
 // NewLayer creates a new layer with n nodes
-func NewLayer(n int, activation entities.ActivationType) ports.ILayer {
-	neurons := make([]ports.INeuron, n)
+func NewLayer(n int, activation entities.ActivationType) *Layer {
+	neurons := make([]*neuron.Neuron, n)
 
 	for i := 0; i < n; i++ {
 		act := activation
@@ -32,70 +31,51 @@ func NewLayer(n int, activation entities.ActivationType) ports.ILayer {
 	}
 }
 
-func (l *Layer) GetNeurons() []ports.INeuron {
-	return l.Neurons
-}
-func (l *Layer) GetA() entities.ActivationType {
-	return l.A
-}
-
-func (l *Layer) SetNeurons(neurons []ports.INeuron) {
-	l.Neurons = neurons
-}
-
-func (l *Layer) SetA(a entities.ActivationType) {
-	l.A = a
-}
-
-func (l *Layer) AddNeuron(neuron ports.INeuron) {
-	l.Neurons = append(l.Neurons, neuron)
-}
-
 func (l *Layer) Fire() {
 	for _, n := range l.Neurons {
 		n.Fire()
 	}
 	if l.A == entities.ActivationSoftmax {
 		outs := make([]float64, len(l.Neurons))
-		for i, _ := range l.Neurons {
-			outs[i] = l.Neurons[i].GetValue()
+		for i, neuron := range l.Neurons {
+			outs[i] = neuron.Value
 		}
 		sm := utils.Softmax(outs)
 		for i, neuron := range l.Neurons {
-			neuron.SetValue(sm[i])
+			neuron.Value = sm[i]
 		}
 	}
 }
 
 // Connect fully connects layer l to next, and initializes each
 // synapse with the given weight function
-func (l *Layer) Connect(next ports.ILayer, weight synapse.WeightInitializer) {
+func (l *Layer) Connect(next *Layer, weight synapse.WeightInitializer) {
 	for i := range l.Neurons {
-		for j := range next.GetNeurons() {
+		for j := range next.Neurons {
 			syn := synapse.NewSynapse(weight())
-			l.Neurons[i].AddOut(syn)
-			next.GetNeurons()[j].AddIn(syn)
+			l.Neurons[i].Out = append(l.Neurons[i].Out, syn)
+			next.Neurons[j].In = append(next.Neurons[j].In, syn)
 		}
 	}
 }
 
 // ApplyBias creates and returns a bias synapse for each neuron in l
-func (l *Layer) ApplyBias(weight synapse.WeightInitializer) []ports.ISynapse {
-	biases := make([]ports.ISynapse, len(l.Neurons))
+func (l *Layer) ApplyBias(weight synapse.WeightInitializer) []*synapse.Synapse {
+	biases := make([]*synapse.Synapse, len(l.Neurons))
 	for i := range l.Neurons {
 		biases[i] = synapse.NewSynapse(weight())
-		biases[i].SetIsBias(true)
-		l.Neurons[i].AddIn(biases[i])
+		biases[i].IsBias = true
+		l.Neurons[i].In = append(l.Neurons[i].In, biases[i])
 	}
 	return biases
 }
 
-func (l *Layer) String() string {
+func (l Layer) String() string {
 	weights := make([][]float64, len(l.Neurons))
 	for i, n := range l.Neurons {
-		weights[i] = make([]float64, len(n.GetIn()))
-		for j, s := range n.GetIn() {
-			weights[i][j] = s.GetWeight()
+		weights[i] = make([]float64, len(n.In))
+		for j, s := range n.In {
+			weights[i][j] = s.Weight
 		}
 	}
 	return fmt.Sprintf("%+v", weights)

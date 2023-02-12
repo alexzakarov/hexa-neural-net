@@ -1,10 +1,13 @@
 package ports
 
-import (
-	"main/internal/neural_net/application/services/layer/neuron/synapse"
-	"main/internal/neural_net/domain/entities"
-)
+// Differentiable is an activation function and its first order derivative,
+// where the latter is expressed as a function of the former for efficiency
+type Differentiable interface {
+	F(float64) float64
+	Df(float64) float64
+}
 
+/*
 type ILayer interface {
 	Fire()
 	Connect(ILayer, synapse.WeightInitializer)
@@ -15,13 +18,6 @@ type ILayer interface {
 	SetNeurons([]INeuron)
 	SetA(entities.ActivationType)
 	AddNeuron(INeuron)
-}
-
-// Differentiable is an activation function and its first order derivative,
-// where the latter is expressed as a function of the former for efficiency
-type Differentiable interface {
-	F(float64) float64
-	Df(float64) float64
 }
 
 type ISynapse interface {
@@ -50,6 +46,7 @@ type INeuron interface {
 	SetValue(float64)
 	AddIn(ISynapse)
 	AddOut(ISynapse)
+	UpdateIn(ISynapse, int)
 }
 
 type INeuralNet interface {
@@ -60,8 +57,9 @@ type INeuralNet interface {
 	String() string
 	ApplyWeights([][][]float64)
 	Weights() [][][]float64
-	Dump() *entities.Dump
+	Dump() *Dump
 	GetLayers() []ILayer
 	GetBiases() [][]ISynapse
 	GetConfig() entities.Config
 }
+*/
